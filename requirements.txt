@@ -1,0 +1,11 @@
+tensorflow==2.19.0
+pathlib
+numpy
+pandas
+matplotlib
+seaborn
+scikit-learn
+keras
+torch
+opencv-python==4.10.0.84
+tqdm
