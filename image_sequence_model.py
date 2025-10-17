@@ -1,11 +1,9 @@
-# 실행 예시: python image_sequence_model.py --video "sample.mp4" --model "my_model.keras" --framework keras
+# 실행 예시: python image_sequence_model.py --video "Clip 4.mp4" --model "vgg19_bilstm_binary_resaved.keras" --framework keras
 
 import os, math, json, re, argparse, sys
 from pathlib import Path
 from typing import List, Tuple, Optional, Sequence
 import urllib.request
-import tensorflow as tf
-import torch
 import cv2, numpy as np, pandas as pd
 from tqdm import tqdm
 
@@ -27,6 +25,34 @@ URLS = {
     "caffemodel": "https://github.com/tureckova/Doggie-smile/raw/master/MobileNetSSD_deploy.caffemodel",
     "head_dat": "https://github.com/tureckova/Doggie-smile/raw/master/dogHeadDetector.dat",
 }
+
+
+
+def _compat_custom_objects():
+    import keras
+    from keras.layers import Reshape
+
+    class PatchedReshape(Reshape):
+        def __init__(self, target_shape, **kwargs):
+            # int → (int,), list → tuple 로 보정
+            if isinstance(target_shape, int):
+                target_shape = (target_shape,)
+            elif isinstance(target_shape, list):
+                target_shape = tuple(target_shape)
+            super().__init__(target_shape=target_shape, **kwargs)
+
+    return {"Reshape": PatchedReshape}
+
+
+def load_model_compat(model_path: str):
+    import keras
+    return keras.models.load_model(
+        model_path,
+        compile=False,
+        custom_objects=_compat_custom_objects(),
+    )
+
+
 
 def _download_if_missing(url: str, dst: Path):
     dst.parent.mkdir(parents=True, exist_ok=True)
@@ -288,9 +314,15 @@ def load_seq_imgs(seqp: List[Path], size:int, norm:str, framework:str)->np.ndarr
     return np.stack(imgs, axis=0)  # (T,HWC) or (T,CHW)
 
 # ----------------------- 추론 -----------------------
-def predict_keras(model_path:str, seq_batches:List[List[np.ndarray]], batch_size:int=8)->List[np.ndarray]:
-    
-    model = tf.keras.models.load_model(model_path, compile=False)
+def predict_keras(model_path:str, seq_batches, batch_size:int=8):
+    # keras 우선 로더 + Reshape 패치
+    try:
+        model = load_model_compat(model_path)
+    except Exception:
+        # 혹시 keras가 실패하면 tf.keras로 시도
+        import tensorflow as tf
+        model = tf.keras.models.load_model_compat(model_path, compile=False)
+
     preds=[]
     for seqs in tqdm(seq_batches, total=len(seq_batches), desc="Keras infer"):
         X = np.stack(seqs, axis=0)  # (B,T,H,W,C)
@@ -298,14 +330,16 @@ def predict_keras(model_path:str, seq_batches:List[List[np.ndarray]], batch_size
         preds.extend([y[i] for i in range(y.shape[0])])
     return preds
 
-def predict_torch(model_path:str, seq_batches:List[List[np.ndarray]], batch_size:int=8, device:str="cuda")->List[np.ndarray]:
+
+def predict_torch(model_path:str, seq_batches, batch_size:int=8, device:str="cuda"):
+    import torch  # ← 여기서 임포트
     dev = torch.device(device if torch.cuda.is_available() and device.startswith("cuda") else "cpu")
     model = torch.load(model_path, map_location=dev)
     if hasattr(model, "eval"): model.eval()
     preds=[]
     with torch.no_grad():
         for seqs in tqdm(seq_batches, total=len(seq_batches), desc="Torch infer"):
-            X = np.stack(seqs, axis=0)  # (B,T,C,H,W)
+            X = np.stack(seqs, axis=0)
             X = torch.from_numpy(X).to(dev)
             y = model(X)
             if isinstance(y,(tuple,list)): y=y[0]
