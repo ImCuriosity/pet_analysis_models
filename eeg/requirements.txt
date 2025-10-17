@@ -1,5 +1,9 @@
-torch>=2.1.0
-numpy>=1.24.0
-pandas>=2.0.0
-scipy>=1.11.0
-openpyxl>=3.1.2
+python -m venv venv
+.\venv\Scripts\activate  # Windows PowerShell/Command Prompt
+# source venv/bin/activate  # Linux/macOS
+pip install fastapi uvicorn numpy pandas openpyxl torch scipy
+# Anaconda 환경 또는 이전에 활성화한 가상 환경이 활성화된 상태에서 실행해야 합니다.
+pip install fastapi uvicorn numpy pandas openpyxl torch scipy
+uvicorn main:app --reload
+# jinja2 패키지 설치 (HTML 템플릿 렌더링용)
+pip install jinja2
