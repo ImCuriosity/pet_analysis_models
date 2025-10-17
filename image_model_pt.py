@@ -4,7 +4,6 @@ import os, cv2, re, math, json, numpy as np, pandas as pd
 from pathlib import Path
 from typing import List, Tuple, Optional, Sequence
 from tqdm import tqdm
-
 import torch
 import torch.nn as nn
 from torchvision import models
