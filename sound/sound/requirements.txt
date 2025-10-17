@@ -1,0 +1,8 @@
+transformers
+evaluate
+torch
+torchaudio
+soundfile
+scikit-learn
+transformers[torch]
+pydub
