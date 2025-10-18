@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EEG 분석 서비스</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; background-color: #f4f4f9; }
+        .container { max-width: 600px; margin: auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        h1 { color: #333; text-align: center; }
+        input[type="file"] { margin-bottom: 20px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; width: 100%; box-sizing: border-box; }
+        button { 
+            background-color: #007bff; color: white; padding: 10px 15px; border: none; border-radius: 4px; 
+            cursor: pointer; font-size: 16px; width: 100%; 
+        }
+        button:hover { background-color: #0056b3; }
+        #result { margin-top: 30px; padding: 15px; border: 1px dashed #007bff; border-radius: 4px; min-height: 50px; background-color: #e9f7ff; }
+        .error { color: red; font-weight: bold; }
+        /* 로딩 애니메이션은 생략하고 텍스트만 처리 */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>뇌파 (EEG) 데이터 분석기</h1>
+        <p>분석할 Excel 파일(.xlsx 또는 .xls)을 선택하고 분석 버튼을 눌러주세요.</p>
+        
+        <input type="file" id="eegFile" accept=".xlsx, .xls">
+        
+        <button onclick="analyzeData()" id="analyzeButton">데이터 분석 시작</button>
+        
+        <div id="result">
+            분석 결과가 여기에 표시됩니다.
+        </div>
+    </div>
+
+    <script>
+        async function analyzeData() {
+            const fileInput = document.getElementById('eegFile');
+            const resultDiv = document.getElementById('result');
+            const button = document.getElementById('analyzeButton');
+            
+            if (fileInput.files.length === 0) {
+                resultDiv.innerHTML = '<span class="error">⚠️ 파일을 선택해 주세요.</span>';
+                return;
+            }
+            const file = fileInput.files[0];
+            
+            // UI 상태 변경 (로딩 시작)
+            button.disabled = true;
+            button.innerHTML = '분석 중... (잠시만 기다려 주세요)';
+            resultDiv.innerHTML = '모델을 사용하여 분석 중입니다...';
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            try {
+                // FastAPI 엔드포인트 호출 (POST /analyze/)
+                const response = await fetch('/analyze/', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+
+                // 응답 처리
+                if (response.ok) {
+                    // 성공
+                    resultDiv.innerHTML = `
+                        <h2>✅ 분석 완료: ${data.filename}</h2>
+                        <p style="font-size: 1.2em;">${data.message}</p>
+                        <hr>
+                        <p><strong>긍정 감정 (Positive) 백분율:</strong> <span style="color: blue;">${data.positive_percent}%</span></p>
+                        <p><strong>활성도 (Active) 백분율:</strong> <span style="color: orange;">${data.active_percent}%</span></p>
+                    `;
+                } else {
+                    // API 에러 반환 (400, 500 등)
+                    resultDiv.innerHTML = `<span class="error">❌ API 에러 발생: ${data.detail || '알 수 없는 오류'}</span>`;
+                }
+            } catch (error) {
+                // 네트워크 오류 처리
+                resultDiv.innerHTML = `<span class="error">❌ 네트워크 오류: 서버 연결 또는 요청에 문제가 발생했습니다.</span>`;
+            } finally {
+                // UI 상태 복구
+                button.disabled = false;
+                button.innerHTML = '데이터 분석 시작';
+            }
+        }
+    </script>
+</body>
+</html>
